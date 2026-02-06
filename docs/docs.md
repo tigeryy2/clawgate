@@ -24,3 +24,10 @@
 
 - `SIDECAR_PLUGINS_JSON` accepts a JSON list:
   - `id`, `base_url`, optional `shared_secret`, optional `timeout_seconds`
+
+## Local API Bind Defaults
+
+- Host env: `CLAWGATE_API_HOST` (default `127.0.0.1`)
+- Port env: `CLAWGATE_API_PORT` (default `8117`)
+- Canonical local base URL: `http://127.0.0.1:8117/v1`
+- Start command that uses these values: `uv run python-template`

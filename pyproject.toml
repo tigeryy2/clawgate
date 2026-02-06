@@ -12,6 +12,7 @@ dependencies = [
     "fastapi>=0.128.2",
     "findmy>=0.9.8",
     "python-dotenv>=1.0.1",
+    "uvicorn>=0.40.0",
 ]
 
 [project.scripts]
