@@ -23,11 +23,10 @@ from python_template.core.models import (
 from python_template.core.plugin_registry import ActionContext
 
 try:
-    from findmy import AppleAccount, FindMyAccessory, LocalAnisetteProvider
+    from findmy import AppleAccount, FindMyAccessory
 except ImportError:  # pragma: no cover - exercised with dependency installed
     AppleAccount = None
     FindMyAccessory = None
-    LocalAnisetteProvider = None
 
 
 @dataclass(frozen=True)
@@ -192,11 +191,7 @@ class FindMyPlugin:
         return devices
 
     def _fetch_locations(self) -> list[dict[str, Any]]:
-        if (
-            AppleAccount is None
-            or FindMyAccessory is None
-            or LocalAnisetteProvider is None
-        ):
+        if AppleAccount is None or FindMyAccessory is None:
             raise ValidationError("FindMy.py dependency is not installed")
 
         if not self._account_json.exists():
@@ -240,10 +235,8 @@ class FindMyPlugin:
         anisette_path = str(self._anisette_libs)
         if not self._anisette_libs.exists():
             anisette_path = "ani_libs.bin"
-        provider = LocalAnisetteProvider(anisette_path)
         self._account = AppleAccount.from_json(
             str(self._account_json),
-            anisette_provider=provider,
             anisette_libs_path=anisette_path,
         )
         return self._account

@@ -608,17 +608,14 @@ class AppleMusicPlugin:
         escaped_query = self._escape_applescript_text(query_text)
         escaped_artist = self._escape_applescript_text(artist_name or "")
         safe_limit = max(1, min(limit, 100))
-        if artist_name:
-            artist_clause = f'and artist_name contains "{escaped_artist}"'
-        else:
-            artist_clause = ""
 
         return f"""
         set field_delim to ASCII character 31
         set row_delim to ASCII character 30
         tell application "Music"
             set rows to {{}}
-            repeat with item_track in tracks of playlist "Library"
+            set search_results to search playlist "Library" for "{escaped_query}"
+            repeat with item_track in search_results
                 set track_name to ""
                 set artist_name to ""
                 set album_name to ""
@@ -631,11 +628,17 @@ class AppleMusicPlugin:
                 try
                     set album_name to (album of item_track) as text
                 end try
+                set include_track to true
                 ignoring case
-                    if track_name contains "{escaped_query}" {artist_clause} then
-                        copy (track_name & field_delim & artist_name & field_delim & album_name) to end of rows
+                    if "{escaped_artist}" is not "" then
+                        if artist_name does not contain "{escaped_artist}" then
+                            set include_track to false
+                        end if
                     end if
                 end ignoring
+                if include_track then
+                    copy (track_name & field_delim & artist_name & field_delim & album_name) to end of rows
+                end if
                 if (count of rows) is greater than or equal to {safe_limit} then
                     exit repeat
                 end if

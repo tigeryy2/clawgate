@@ -32,9 +32,12 @@ class StubRunner:
                 "Teardrop\x1fMassive Attack\x1fMezzanine"
             )
 
-        if 'repeat with item_track in tracks of playlist "Library"' in script:
-            if 'contains "Yellow"' in script:
+        if 'search playlist "Library" for "Yellow"' in script:
+            if 'artist_name does not contain "Coldplay"' in script:
                 return "Yellow\x1fColdplay\x1fParachutes"
+            return "__TRACK_NOT_FOUND__"
+
+        if 'set search_results to search playlist "Library" for "' in script:
             return "__TRACK_NOT_FOUND__"
 
         if 'play (first track of playlist "Library"' in script:
@@ -103,6 +106,9 @@ def test_track_search_and_play_song_execute():
         ReadQuery(limit=5, q="Yellow", filters={"artist": "Coldplay"}),
     )
     assert search_result.data["items"][0]["track"] == "Yellow"
+    assert any(
+        'search playlist "Library" for "Yellow"' in call for call in runner.calls
+    )
 
     play_song = _action(plugin, name="play_song", resource=None)
     context = ActionContext(
