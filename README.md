@@ -43,7 +43,7 @@ Trusted-box API runtime with plugin-scoped REST reads and `:{action}` RPC endpoi
 
 ## Daily Commands
 
-- Run API (default bind `127.0.0.1:8117`): `uv run python-template`
+- Run API (default bind `0.0.0.0:8117`): `uv run python-template`
 - Run API on a different port: `CLAWGATE_API_PORT=8121 uv run python-template`
 - Run API tests: `uv run pytest`
 - Lint and auto-fix: `uv run ruff check --fix .`
@@ -53,6 +53,7 @@ Trusted-box API runtime with plugin-scoped REST reads and `:{action}` RPC endpoi
 
 `python-dotenv` is used for loading `.env` values.
 Start from [`.env.example`](.env.example) when creating local environment files.
+`uv run python-template` auto-loads `.env` from the repository root.
 
-- API bind host: `CLAWGATE_API_HOST` (default `127.0.0.1`)
+- API bind host: `CLAWGATE_API_HOST` (default `0.0.0.0`)
 - API bind port: `CLAWGATE_API_PORT` (default `8117`)

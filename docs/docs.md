@@ -27,7 +27,8 @@
 
 ## Local API Bind Defaults
 
-- Host env: `CLAWGATE_API_HOST` (default `127.0.0.1`)
+- Host env: `CLAWGATE_API_HOST` (default `0.0.0.0`)
 - Port env: `CLAWGATE_API_PORT` (default `8117`)
+- `uv run python-template` auto-loads `.env` from repository root.
 - Canonical local base URL: `http://127.0.0.1:8117/v1`
 - Start command that uses these values: `uv run python-template`

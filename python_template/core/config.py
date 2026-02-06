@@ -3,6 +3,10 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from dotenv import load_dotenv
+
+from python_template import DOTENV_FILE
+
 
 def _to_bool(value: str | None, default: bool) -> bool:
     if value is None:
@@ -25,7 +29,7 @@ def _to_int(value: str | None, default: int, key: str) -> int:
 @dataclass(frozen=True)
 class Settings:
     api_prefix: str = "/v1"
-    api_host: str = "127.0.0.1"
+    api_host: str = "0.0.0.0"
     api_port: int = 8117
     enable_api_alias: bool = False
     default_limit: int = 20
@@ -38,8 +42,9 @@ class Settings:
 
 
 def load_settings() -> Settings:
+    load_dotenv(DOTENV_FILE)
     return Settings(
-        api_host=os.getenv("CLAWGATE_API_HOST", "127.0.0.1").strip() or "127.0.0.1",
+        api_host=os.getenv("CLAWGATE_API_HOST", "0.0.0.0").strip() or "0.0.0.0",
         api_port=_to_int(
             os.getenv("CLAWGATE_API_PORT"),
             default=8117,
