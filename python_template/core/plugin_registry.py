@@ -4,7 +4,11 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from python_template.core.exceptions import NotFoundError
-from python_template.core.manifests import PluginActionManifest, PluginManifest
+from python_template.core.manifests import (
+    PluginActionManifest,
+    PluginManifest,
+    PluginResourceManifest,
+)
 from python_template.core.models import (
     InternalActionResult,
     InternalReadResult,
@@ -72,8 +76,20 @@ class PluginRegistry:
 
     def list_capabilities(self, plugin_id: str) -> list[dict[str, str]]:
         manifest = self.get_manifest(plugin_id)
-        return [
+        resource_caps = [
             {
+                "kind": "resource",
+                "resource": resource.name,
+                "capability_id": resource.capability_id,
+                "resource_type": resource.name,
+                "risk_tier": "read_only",
+                "route_pattern": f"/{resource.name}",
+            }
+            for resource in manifest.resources
+        ]
+        action_caps = [
+            {
+                "kind": "action",
                 "action": action.name,
                 "capability_id": action.capability_id,
                 "resource_type": action.resource_type,
@@ -82,6 +98,18 @@ class PluginRegistry:
             }
             for action in manifest.actions
         ]
+        return resource_caps + action_caps
+
+    def resolve_resource(
+        self, plugin_id: str, resource_name: str
+    ) -> PluginResourceManifest:
+        manifest = self.get_manifest(plugin_id)
+        for resource in manifest.resources:
+            if resource.name == resource_name:
+                return resource
+        raise NotFoundError(
+            f"resource '{resource_name}' not found in plugin '{plugin_id}'"
+        )
 
     def resolve_action(
         self,

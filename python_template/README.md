@@ -7,3 +7,7 @@ Application package for clawgate runtime and utilities.
 - `plugins/`: First-party plugin implementations.
 - `utils/`: Generic utility and logging helpers.
 - `__main__.py`: Package entrypoint.
+
+## Notes
+- HTTP routes require bearer token + `X-Tailscale-Identity` unless auth is disabled in settings.
+- Third-party plugin sidecars can be loaded with `SIDECAR_PLUGINS_JSON`.

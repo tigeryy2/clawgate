@@ -10,6 +10,20 @@ from python_template.core.models import RiskTier, RuntimeMode
 SNAKE_CASE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
+class PluginResourceManifest(BaseModel):
+    name: str
+    capability_id: str
+    allowed_views: list[str] = Field(default_factory=lambda: ["headers", "body", "raw"])
+
+    @field_validator("name")
+    @classmethod
+    def validate_resource_name(cls, value: str) -> str:
+        if not SNAKE_CASE.match(value):
+            msg = f"resource name '{value}' must be snake_case"
+            raise ValueError(msg)
+        return value
+
+
 class PluginActionManifest(BaseModel):
     name: str
     capability_id: str
@@ -36,7 +50,7 @@ class PluginActionManifest(BaseModel):
         if value is None:
             return value
         if not SNAKE_CASE.match(value):
-            msg = f"resource name '{value}' must be snake_case plural"
+            msg = f"resource name '{value}' must be snake_case"
             raise ValueError(msg)
         return value
 
@@ -55,6 +69,7 @@ class PluginManifest(BaseModel):
     name: str
     version: str
     runtime_mode: RuntimeMode
+    resources: list[PluginResourceManifest] = Field(default_factory=list)
     actions: list[PluginActionManifest]
     required_secrets: list[str] = Field(default_factory=list)
     required_scopes: list[str] = Field(default_factory=list)
@@ -68,6 +83,16 @@ class PluginManifest(BaseModel):
             raise ValueError(msg)
         return value
 
+    @field_validator("resources")
+    @classmethod
+    def validate_resources(
+        cls, value: list[PluginResourceManifest]
+    ) -> list[PluginResourceManifest]:
+        names = [resource.name for resource in value]
+        if len(names) != len(set(names)):
+            raise ValueError("resource names must be unique within plugin")
+        return value
+
     @field_validator("actions")
     @classmethod
     def validate_actions(
@@ -76,8 +101,8 @@ class PluginManifest(BaseModel):
         if not value:
             msg = "manifest must declare at least one action"
             raise ValueError(msg)
-        action_names = {action.name for action in value}
-        if len(action_names) != len(value):
-            msg = "action names must be unique within plugin"
+        action_keys = {(action.name, action.resource) for action in value}
+        if len(action_keys) != len(value):
+            msg = "action names must be unique per resource within plugin"
             raise ValueError(msg)
         return value

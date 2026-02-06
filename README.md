@@ -12,6 +12,9 @@ Trusted-box API runtime with plugin-scoped REST reads and `:{action}` RPC endpoi
 ## API Contract Highlights
 
 - Canonical prefix: `/v1` (`/api` alias is optional and disabled by default).
+- Auth: bearer token + `X-Tailscale-Identity` on every contract route.
+  - Default dev token: `Authorization: Bearer dev-local-token`
+  - Default identity header: `X-Tailscale-Identity: tailnet://local/dev-local`
 - Discovery:
   - `GET /v1/plugins`
   - `GET /v1/plugins/{plugin_id}`
@@ -27,6 +30,16 @@ Trusted-box API runtime with plugin-scoped REST reads and `:{action}` RPC endpoi
   - `GET /v1/approvals/{ticket_id}`
   - `POST /v1/approvals/{ticket_id}:approve`
   - `POST /v1/approvals/{ticket_id}:deny`
+- Runtime modes:
+  - First-party plugins: in-process
+  - Third-party plugins: sidecar via `SIDECAR_PLUGINS_JSON`
+
+## Initial Plugins
+
+- `gmail` (demo reference plugin)
+- `imessage` (BlueBubbles-backed)
+- `apple_music` (`osascript`-backed)
+- `find_my` (`FindMy.py`-backed)
 
 ## Daily Commands
 

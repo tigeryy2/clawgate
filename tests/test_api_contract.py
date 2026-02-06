@@ -2,15 +2,23 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from python_template.api.app import create_app, create_runtime
+from python_template.api.app import create_app
+from python_template.api.runtime import create_runtime
 from python_template.core.config import Settings
+
+DEFAULT_HEADERS = {
+    "Authorization": "Bearer dev-local-token",
+    "X-Tailscale-Identity": "tailnet://local/dev-local",
+}
 
 
 def make_client(enable_api_alias: bool = False) -> TestClient:
     settings = Settings(enable_api_alias=enable_api_alias)
     runtime = create_runtime(settings=settings)
     app = create_app(runtime=runtime)
-    return TestClient(app)
+    client = TestClient(app)
+    client.headers.update(DEFAULT_HEADERS)
+    return client
 
 
 def test_discovery_endpoints_and_alias_default_off():
@@ -18,7 +26,8 @@ def test_discovery_endpoints_and_alias_default_off():
 
     plugins_response = client.get("/v1/plugins")
     assert plugins_response.status_code == 200
-    assert plugins_response.json()[0]["id"] == "gmail"
+    plugin_ids = {plugin["id"] for plugin in plugins_response.json()}
+    assert {"gmail", "imessage", "apple_music", "find_my"}.issubset(plugin_ids)
 
     plugin_response = client.get("/v1/plugins/gmail")
     assert plugin_response.status_code == 200
@@ -199,3 +208,27 @@ def test_openapi_contains_v1_contract_paths_and_shared_schemas():
     schemas = spec["components"]["schemas"]
     assert "ActionRequest" in schemas
     assert "ActionSuccessResponse" in schemas
+
+
+def test_initial_plugins_support_propose_flows_without_external_side_effects():
+    client = make_client()
+
+    imessage = client.post(
+        "/v1/imessage:send/propose",
+        json={
+            "args": {
+                "chat_guid": "chat-1",
+                "text": "On my way",
+            }
+        },
+    )
+    assert imessage.status_code == 200
+    assert "chat-1" in imessage.json()["result"]["chat_guid"]
+
+    apple_music = client.post("/v1/apple_music:play/propose", json={"args": {}})
+    assert apple_music.status_code == 200
+    assert "Play Apple Music" in (apple_music.json()["summary"] or "")
+
+    find_my = client.post("/v1/find_my:refresh/propose", json={"args": {}})
+    assert find_my.status_code == 200
+    assert find_my.json()["result"]["count"] == 0

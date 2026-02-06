@@ -4,7 +4,11 @@ from collections import defaultdict
 from typing import Any
 
 from python_template.core.exceptions import NotFoundError, ValidationError
-from python_template.core.manifests import PluginActionManifest, PluginManifest
+from python_template.core.manifests import (
+    PluginActionManifest,
+    PluginManifest,
+    PluginResourceManifest,
+)
 from python_template.core.models import (
     ActionStatus,
     InternalActionResult,
@@ -23,6 +27,18 @@ class GmailDemoPlugin:
         name="Gmail Demo",
         version="0.1.0",
         runtime_mode=RuntimeMode.in_process,
+        resources=[
+            PluginResourceManifest(
+                name="threads",
+                capability_id="gmail.threads.read",
+                allowed_views=["headers", "body"],
+            ),
+            PluginResourceManifest(
+                name="messages",
+                capability_id="gmail.messages.read",
+                allowed_views=["headers", "body", "raw"],
+            ),
+        ],
         required_secrets=["google_oauth_token"],
         required_scopes=["https://www.googleapis.com/auth/gmail.readonly"],
         default_policy={
