@@ -25,6 +25,16 @@
 - `SIDECAR_PLUGINS_JSON` accepts a JSON list:
   - `id`, `base_url`, optional `shared_secret`, optional `timeout_seconds`
 
+## Approval Config
+
+- `ACTION_APPROVAL_DEFAULTS_JSON` accepts a JSON object keyed by risk tier:
+  - `read_only`, `routine`, `transactional`, `dangerous` -> boolean `requires_approval`
+- `ACTION_APPROVAL_OVERRIDES_JSON` accepts a JSON object:
+  - `global.allow[]` / `global.require[]` capability patterns (`*` suffix wildcard supported)
+  - `plugins.{plugin_id}.allow[]` / `plugins.{plugin_id}.require[]` plugin-scoped patterns
+- Precedence:
+  - plugin `require` > plugin `allow` > global `require` > global `allow` > risk-tier default
+
 ## Local API Bind Defaults
 
 - Host env: `CLAWGATE_API_HOST` (default `0.0.0.0`)

@@ -39,6 +39,8 @@ class Settings:
     require_auth: bool = True
     agent_tokens_json: str | None = None
     sidecar_plugins_json: str | None = None
+    action_approval_defaults_json: str | None = None
+    action_approval_overrides_json: str | None = None
 
 
 def load_settings() -> Settings:
@@ -55,4 +57,6 @@ def load_settings() -> Settings:
         require_auth=_to_bool(os.getenv("REQUIRE_AUTH"), default=True),
         agent_tokens_json=os.getenv("AGENT_TOKENS_JSON"),
         sidecar_plugins_json=os.getenv("SIDECAR_PLUGINS_JSON"),
+        action_approval_defaults_json=os.getenv("ACTION_APPROVAL_DEFAULTS_JSON"),
+        action_approval_overrides_json=os.getenv("ACTION_APPROVAL_OVERRIDES_JSON"),
     )

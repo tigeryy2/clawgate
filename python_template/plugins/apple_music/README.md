@@ -1,5 +1,5 @@
 # Apple Music Plugin
-Apple Music control and read endpoints powered by `osascript`.
+Apple Music playback controls and library read endpoints powered by `osascript`.
 
 ## Contents
-- `plugin.py`: Apple Music resource reads and playback actions.
+- `plugin.py`: Playback controls, playback history reads, playlist track reads, and track search/play actions.

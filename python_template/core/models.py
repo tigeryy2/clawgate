@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 class RiskTier(StrEnum):
     read_only = "read_only"
+    routine = "routine"
     transactional = "transactional"
     dangerous = "dangerous"
 

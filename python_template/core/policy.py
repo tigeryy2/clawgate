@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -12,12 +13,27 @@ _URL_PATTERN = re.compile(r"https?://\S+")
 _HTML_TAG_PATTERN = re.compile(r"<[^>]+>")
 _WHITESPACE_PATTERN = re.compile(r"\s+")
 _EMAIL_PATTERN = re.compile(r"^[^@\s]+@([^@\s]+)$")
+_DEFAULT_APPROVAL_BY_RISK = {
+    "read_only": False,
+    "routine": False,
+    "transactional": True,
+    "dangerous": True,
+}
 
 
 class PolicyEngine:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.blocked_domains = {"blocked.example"}
+        self._approval_defaults = self._load_approval_defaults(
+            settings.action_approval_defaults_json
+        )
+        (
+            self._global_allow_patterns,
+            self._global_require_patterns,
+            self._plugin_allow_patterns,
+            self._plugin_require_patterns,
+        ) = self._load_approval_overrides(settings.action_approval_overrides_json)
 
     def normalize_limit(self, limit: int) -> int:
         if limit < 1:
@@ -50,7 +66,22 @@ class PolicyEngine:
     def requires_approval(self, action: PluginActionManifest, phase: str) -> bool:
         if phase != "execute":
             return False
-        return action.risk_tier.value != "read_only"
+        capability_id = action.capability_id
+        plugin_id = self._plugin_id_for(capability_id)
+
+        plugin_require = self._plugin_require_patterns.get(plugin_id, ())
+        plugin_allow = self._plugin_allow_patterns.get(plugin_id, ())
+        if self._matches_any(capability_id, plugin_require):
+            return True
+        if self._matches_any(capability_id, plugin_allow):
+            return False
+
+        if self._matches_any(capability_id, self._global_require_patterns):
+            return True
+        if self._matches_any(capability_id, self._global_allow_patterns):
+            return False
+
+        return self._approval_defaults.get(action.risk_tier.value, True)
 
     def enforce_view_policy(self, view: str | None) -> None:
         if view == "raw" and not self.settings.raw_read_enabled:
@@ -109,6 +140,158 @@ class PolicyEngine:
             if maybe_idx.isdigit():
                 return int(maybe_idx)
         return None
+
+    @staticmethod
+    def _plugin_id_for(capability_id: str) -> str:
+        if "." not in capability_id:
+            return capability_id
+        return capability_id.split(".", maxsplit=1)[0]
+
+    @staticmethod
+    def _matches_any(capability_id: str, patterns: tuple[str, ...]) -> bool:
+        return any(
+            PolicyEngine._matches_pattern(capability_id, pattern)
+            for pattern in patterns
+        )
+
+    @staticmethod
+    def _matches_pattern(capability_id: str, pattern: str) -> bool:
+        if pattern.endswith("*"):
+            return capability_id.startswith(pattern[:-1])
+        return capability_id == pattern
+
+    def _load_approval_defaults(self, raw_json: str | None) -> dict[str, bool]:
+        defaults = dict(_DEFAULT_APPROVAL_BY_RISK)
+        if not raw_json:
+            return defaults
+        try:
+            payload = json.loads(raw_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                "ACTION_APPROVAL_DEFAULTS_JSON must be valid JSON"
+            ) from exc
+        if not isinstance(payload, dict):
+            raise ValueError("ACTION_APPROVAL_DEFAULTS_JSON must be a JSON object")
+
+        for risk_tier, requires_approval in payload.items():
+            if risk_tier not in defaults:
+                raise ValueError(
+                    f"ACTION_APPROVAL_DEFAULTS_JSON has unknown risk tier '{risk_tier}'"
+                )
+            if not isinstance(requires_approval, bool):
+                raise ValueError(
+                    f"ACTION_APPROVAL_DEFAULTS_JSON value for '{risk_tier}' must be boolean"
+                )
+            defaults[risk_tier] = requires_approval
+        return defaults
+
+    def _load_approval_overrides(
+        self,
+        raw_json: str | None,
+    ) -> tuple[
+        tuple[str, ...],
+        tuple[str, ...],
+        dict[str, tuple[str, ...]],
+        dict[str, tuple[str, ...]],
+    ]:
+        if not raw_json:
+            return tuple(), tuple(), {}, {}
+        try:
+            payload = json.loads(raw_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                "ACTION_APPROVAL_OVERRIDES_JSON must be valid JSON"
+            ) from exc
+        if not isinstance(payload, dict):
+            raise ValueError("ACTION_APPROVAL_OVERRIDES_JSON must be a JSON object")
+
+        global_config = payload.get("global", {})
+        global_allow, global_require = self._parse_override_block(
+            block=global_config,
+            source="ACTION_APPROVAL_OVERRIDES_JSON.global",
+            plugin_id=None,
+        )
+
+        plugin_allow: dict[str, tuple[str, ...]] = {}
+        plugin_require: dict[str, tuple[str, ...]] = {}
+        plugins_config = payload.get("plugins", {})
+        if plugins_config is not None and not isinstance(plugins_config, dict):
+            raise ValueError(
+                "ACTION_APPROVAL_OVERRIDES_JSON.plugins must be an object of plugin ids"
+            )
+        for plugin_id, block in plugins_config.items():
+            if not isinstance(plugin_id, str) or not plugin_id.strip():
+                raise ValueError(
+                    "ACTION_APPROVAL_OVERRIDES_JSON.plugins keys must be non-empty plugin ids"
+                )
+            allow_patterns, require_patterns = self._parse_override_block(
+                block=block,
+                source=f"ACTION_APPROVAL_OVERRIDES_JSON.plugins.{plugin_id}",
+                plugin_id=plugin_id.strip(),
+            )
+            plugin_allow[plugin_id.strip()] = allow_patterns
+            plugin_require[plugin_id.strip()] = require_patterns
+
+        return global_allow, global_require, plugin_allow, plugin_require
+
+    def _parse_override_block(
+        self,
+        block: Any,
+        source: str,
+        plugin_id: str | None,
+    ) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        if block is None:
+            return tuple(), tuple()
+        if not isinstance(block, dict):
+            raise ValueError(f"{source} must be an object")
+
+        allow_patterns = self._normalize_patterns(
+            raw_patterns=block.get("allow"),
+            source=f"{source}.allow",
+            plugin_id=plugin_id,
+        )
+        require_patterns = self._normalize_patterns(
+            raw_patterns=block.get("require"),
+            source=f"{source}.require",
+            plugin_id=plugin_id,
+        )
+        return allow_patterns, require_patterns
+
+    def _normalize_patterns(
+        self,
+        raw_patterns: Any,
+        source: str,
+        plugin_id: str | None,
+    ) -> tuple[str, ...]:
+        if raw_patterns is None:
+            return tuple()
+        if not isinstance(raw_patterns, list):
+            raise ValueError(f"{source} must be a list")
+
+        normalized: list[str] = []
+        for raw_pattern in raw_patterns:
+            if not isinstance(raw_pattern, str) or not raw_pattern.strip():
+                raise ValueError(f"{source} entries must be non-empty strings")
+            pattern = raw_pattern.strip()
+            if pattern.count("*") > 1 or ("*" in pattern and not pattern.endswith("*")):
+                raise ValueError(
+                    f"{source} pattern '{pattern}' only supports trailing *"
+                )
+            if plugin_id:
+                pattern = self._normalize_plugin_pattern(
+                    plugin_id=plugin_id,
+                    pattern=pattern,
+                )
+            normalized.append(pattern)
+        return tuple(normalized)
+
+    @staticmethod
+    def _normalize_plugin_pattern(plugin_id: str, pattern: str) -> str:
+        if pattern == "*":
+            return f"{plugin_id}.*"
+        if pattern.startswith(f"{plugin_id}."):
+            return pattern
+        return f"{plugin_id}.{pattern.lstrip('.')}"
 
     def _extract_domains_from_args(self, args: dict[str, Any]) -> set[str]:
         domains: set[str] = set()
